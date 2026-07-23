@@ -1,0 +1,24 @@
+[project]
+name = "relayx"
+version = "0.1.0"
+description = "Message-oriented encrypted HTTP relay over HTTP/1.1"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "httpx",
+  "cryptography",
+  "msgpack",
+  "zstandard",
+  "pydantic-settings",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[project.scripts]
+relayx = "relayx.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
