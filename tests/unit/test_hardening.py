@@ -227,3 +227,9 @@ def test_error_mapping_preserves_request_id_when_available():
     err = _error_from_exception(RequestTooLargeError("large"), REQ_ID)
     assert err.request_id == REQ_ID
     assert err.error_code == "request_too_large"
+
+
+@pytest.mark.asyncio
+async def test_limited_body_rejects_oversized_chunk_before_buffering():
+    with pytest.raises(Exception):
+        await read_limited_body(FakeRequest([b"a" * 10]), max_bytes=3)

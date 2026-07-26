@@ -38,9 +38,9 @@ async def authenticate(auth_header: str | None, token: str) -> None:
 async def read_limited_body(request: Request, max_bytes: int) -> bytes:
     body = bytearray()
     async for chunk in request.stream():
-        body.extend(chunk)
-        if len(body) > max_bytes:
+        if len(chunk) > max_bytes - len(body):
             raise HTTPException(status_code=413, detail="Payload Too Large")
+        body.extend(chunk)
     return bytes(body)
 
 
