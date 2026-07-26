@@ -5,6 +5,7 @@ import asyncio
 import uvicorn
 from relayx.client.app import create_proxy
 from relayx.config import RelaySettings
+from relayx.logging import configure_logging
 from relayx.server.app import create_app
 
 async def _run_client(settings: RelaySettings) -> None:
@@ -18,6 +19,7 @@ def main() -> None:
     parser.add_argument("mode", choices=["server", "client"])
     args = parser.parse_args()
     settings = RelaySettings()
+    configure_logging(settings.log_level)
     if args.mode == "server":
         uvicorn.run(create_app(settings), host=settings.server_host, port=settings.server_port, http="h11")
     if args.mode == "client":

@@ -9,6 +9,10 @@ class Forwarder:
         self.client = client
         self.max_response_body_bytes = max_response_body_bytes
 
+    @property
+    def is_available(self) -> bool:
+        return not self.client.is_closed
+
     async def forward(self, request: RelayRequest) -> RelayResponse | RelayError:
         port = request.port
         netloc = request.host if port is None else f"{request.host}:{port}"
