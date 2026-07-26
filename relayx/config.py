@@ -25,6 +25,7 @@ class RelaySettings(BaseSettings):
     max_response_body_bytes: int = DEFAULT_MAX_RESPONSE_BODY_BYTES
     max_header_bytes: int = DEFAULT_MAX_HEADER_BYTES
     timeout_seconds: float = 30.0
+    log_level: str = "INFO"
 
     @field_validator("auth_token", "encryption_key")
     @classmethod
@@ -53,6 +54,14 @@ class RelaySettings(BaseSettings):
         if value < 0:
             raise ValueError("setting must be non-negative")
         return value
+
+    @field_validator("log_level")
+    @classmethod
+    def _valid_log_level(cls, value: str) -> str:
+        normalized = value.upper()
+        if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise ValueError("log level must be DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+        return normalized
 
     @field_validator("timeout_seconds")
     @classmethod
