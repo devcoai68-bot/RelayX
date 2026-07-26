@@ -1,5 +1,6 @@
 from relayx.compression import maybe_compress, maybe_decompress
 
+
 def test_threshold_compression():
     data = b"a" * 100
     raw, flag = maybe_compress(data, True, 101)

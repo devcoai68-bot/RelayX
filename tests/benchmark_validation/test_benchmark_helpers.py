@@ -1,6 +1,12 @@
 from benchmarks.benchmark_compression import benchmark as compression_benchmark
 from benchmarks.benchmark_crypto import benchmark as crypto_benchmark
-from benchmarks.common import BenchmarkResult, deterministic_payload, format_table, hex_request_id, summarize_latencies
+from benchmarks.common import (
+    BenchmarkResult,
+    deterministic_payload,
+    format_table,
+    hex_request_id,
+    summarize_latencies,
+)
 
 
 def test_latency_summary_is_deterministic():
@@ -32,7 +38,13 @@ def test_small_crypto_benchmark_shape(monkeypatch):
     result = crypto_benchmark(iterations=1, warmup=0)
 
     assert isinstance(result, BenchmarkResult)
-    assert result.columns == ("payload", "encrypt MiB/s", "decrypt MiB/s", "encrypt ms", "decrypt ms")
+    assert result.columns == (
+        "payload",
+        "encrypt MiB/s",
+        "decrypt MiB/s",
+        "encrypt ms",
+        "decrypt ms",
+    )
     assert len(result.rows) == 1
 
 
@@ -41,5 +53,12 @@ def test_small_compression_benchmark_shape(monkeypatch):
     result = compression_benchmark(iterations=1, warmup=0)
 
     assert isinstance(result, BenchmarkResult)
-    assert result.columns == ("payload", "threshold", "ratio", "compress ms", "decompress ms", "compressed")
+    assert result.columns == (
+        "payload",
+        "threshold",
+        "ratio",
+        "compress ms",
+        "decompress ms",
+        "compressed",
+    )
     assert len(result.rows) == 3

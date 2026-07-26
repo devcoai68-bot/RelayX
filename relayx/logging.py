@@ -1,4 +1,5 @@
 """Structured logging helpers for RelayX."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,16 @@ import sys
 from collections.abc import Mapping
 from typing import Any
 
-_SECRET_FIELDS = {"authorization", "auth_token", "encryption_key", "token", "key", "body", "request_body", "response_body"}
+_SECRET_FIELDS = {
+    "authorization",
+    "auth_token",
+    "encryption_key",
+    "token",
+    "key",
+    "body",
+    "request_body",
+    "response_body",
+}
 
 
 class JsonFormatter(logging.Formatter):

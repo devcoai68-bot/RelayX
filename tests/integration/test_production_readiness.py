@@ -26,7 +26,9 @@ def _settings(**overrides):
 async def test_health_and_ready_endpoints():
     app = create_app(_settings())
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://relay.test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://relay.test"
+    ) as client:
         health = await client.get("/health")
         ready = await client.get("/ready")
 
@@ -46,21 +48,49 @@ async def test_large_request_and_response_roundtrip():
     @upstream.post("/large")
     async def large(request: Request):
         request_body = await request.body()
-        return Response(response_body + request_body[-16:], media_type="application/octet-stream")
+        return Response(
+            response_body + request_body[-16:], media_type="application/octet-stream"
+        )
 
     upstream_transport = httpx.ASGITransport(app=upstream)
-    server_settings = _settings(max_request_body_bytes=100000, max_response_body_bytes=100000, max_carrier_body_bytes=200000, max_decompressed_bytes=200000)
+    server_settings = _settings(
+        max_request_body_bytes=100000,
+        max_response_body_bytes=100000,
+        max_carrier_body_bytes=200000,
+        max_decompressed_bytes=200000,
+    )
     relay_app = create_app(server_settings)
     relay_transport = httpx.ASGITransport(app=relay_app)
 
-    async with httpx.AsyncClient(transport=upstream_transport, base_url="https://upstream.test") as upstream_client:
+    async with httpx.AsyncClient(
+        transport=upstream_transport, base_url="https://upstream.test"
+    ) as upstream_client:
         relay_app.router.routes.clear()
-        relay_app.include_router(router(server_settings, ReplayCache(), Forwarder(upstream_client, 100000)))
-        async with httpx.AsyncClient(transport=relay_transport, base_url="http://relay.test") as carrier_client:
-            client_settings = _settings(relay_url="http://relay.test/relay", max_carrier_body_bytes=200000, max_decompressed_bytes=200000, max_response_body_bytes=100000)
+        relay_app.include_router(
+            router(server_settings, ReplayCache(), Forwarder(upstream_client, 100000))
+        )
+        async with httpx.AsyncClient(
+            transport=relay_transport, base_url="http://relay.test"
+        ) as carrier_client:
+            client_settings = _settings(
+                relay_url="http://relay.test/relay",
+                max_carrier_body_bytes=200000,
+                max_decompressed_bytes=200000,
+                max_response_body_bytes=100000,
+            )
             client = RelayClient(client_settings, carrier_client)
             body = b"q" * 70000
-            request = RelayRequest("b" * 32, "POST", "https", "upstream.test", None, "/large", "", (("content-type", "application/octet-stream"),), body)
+            request = RelayRequest(
+                "b" * 32,
+                "POST",
+                "https",
+                "upstream.test",
+                None,
+                "/large",
+                "",
+                (("content-type", "application/octet-stream"),),
+                body,
+            )
             response = await client.send(request)
 
     assert isinstance(response, RelayResponse)

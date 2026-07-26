@@ -1,8 +1,12 @@
 """Fully buffered upstream forwarding with bounded response reads."""
+
 from __future__ import annotations
+
 import httpx
+
 from relayx.http.headers import filter_forward_headers
 from relayx.protocol.models import RelayError, RelayRequest, RelayResponse
+
 
 class Forwarder:
     def __init__(self, client: httpx.AsyncClient, max_response_body_bytes: int) -> None:
@@ -20,16 +24,47 @@ class Forwarder:
         if request.query:
             url += f"?{request.query}"
         try:
-            async with self.client.stream(request.method, url, headers=list(filter_forward_headers(request.headers)), content=request.body) as response:
+            async with self.client.stream(
+                request.method,
+                url,
+                headers=list(filter_forward_headers(request.headers)),
+                content=request.body,
+            ) as response:
                 chunks = bytearray()
                 async for chunk in response.aiter_bytes():
                     chunks.extend(chunk)
                     if len(chunks) > self.max_response_body_bytes:
-                        return RelayError(request.request_id, "response_too_large", "Upstream response is too large", False)
-                return RelayResponse(request.request_id, response.status_code, response.reason_phrase, tuple(response.headers.multi_items()), bytes(chunks))
+                        return RelayError(
+                            request.request_id,
+                            "response_too_large",
+                            "Upstream response is too large",
+                            False,
+                        )
+                return RelayResponse(
+                    request.request_id,
+                    response.status_code,
+                    response.reason_phrase,
+                    tuple(response.headers.multi_items()),
+                    bytes(chunks),
+                )
         except httpx.TimeoutException:
-            return RelayError(request.request_id, "upstream_timeout", "Upstream request timed out", True)
+            return RelayError(
+                request.request_id,
+                "upstream_timeout",
+                "Upstream request timed out",
+                True,
+            )
         except httpx.ConnectError:
-            return RelayError(request.request_id, "upstream_connection_failed", "Could not connect to upstream", True)
+            return RelayError(
+                request.request_id,
+                "upstream_connection_failed",
+                "Could not connect to upstream",
+                True,
+            )
         except httpx.HTTPError:
-            return RelayError(request.request_id, "upstream_protocol_error", "Upstream HTTP error", True)
+            return RelayError(
+                request.request_id,
+                "upstream_protocol_error",
+                "Upstream HTTP error",
+                True,
+            )

@@ -26,7 +26,14 @@ DEFAULT_MAX_RESPONSE_BODY_BYTES = 64 * 1024 * 1024
 DEFAULT_MAX_DECOMPRESSED_BYTES = 128 * 1024 * 1024
 DEFAULT_MAX_CARRIER_BODY_BYTES = 128 * 1024 * 1024
 HOP_BY_HOP_HEADERS = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-    "te", "trailer", "transfer-encoding", "upgrade", "content-length",
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+    "content-length",
 }
 PROXY_ONLY_HEADERS = {"proxy-connection", "proxy-authorization", "proxy-authenticate"}

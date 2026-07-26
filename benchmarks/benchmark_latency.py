@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from benchmarks.common import hex_request_id, PAYLOAD_SIZES, BenchmarkResult, deterministic_payload, format_bytes, parse_common_args, run_async, run_profile, summarize_latencies
+from benchmarks.common import (
+    PAYLOAD_SIZES,
+    BenchmarkResult,
+    deterministic_payload,
+    format_bytes,
+    hex_request_id,
+    parse_common_args,
+    run_async,
+    run_profile,
+    summarize_latencies,
+)
 from benchmarks.relay_harness import RelayBenchmarkHarness
 
 
@@ -14,14 +24,29 @@ async def benchmark_async(iterations: int, warmup: int) -> BenchmarkResult:
             samples = []
             for index in range(iterations):
                 import time
+
                 start = time.perf_counter()
                 response = await harness.send(hex_request_id(size + 1, index), payload)
                 samples.append((time.perf_counter() - start) * 1000)
                 if response.body != payload:
                     raise RuntimeError("unexpected relay response body")
             summary = summarize_latencies(samples)
-            rows.append((format_bytes(size), f"{summary['avg_ms']:.3f}", f"{summary['median_ms']:.3f}", f"{summary['p95_ms']:.3f}", f"{summary['p99_ms']:.3f}", f"{summary['min_ms']:.3f}", f"{summary['max_ms']:.3f}"))
-    return BenchmarkResult("latency", ("payload", "avg ms", "median ms", "p95 ms", "p99 ms", "min ms", "max ms"), tuple(rows))
+            rows.append(
+                (
+                    format_bytes(size),
+                    f"{summary['avg_ms']:.3f}",
+                    f"{summary['median_ms']:.3f}",
+                    f"{summary['p95_ms']:.3f}",
+                    f"{summary['p99_ms']:.3f}",
+                    f"{summary['min_ms']:.3f}",
+                    f"{summary['max_ms']:.3f}",
+                )
+            )
+    return BenchmarkResult(
+        "latency",
+        ("payload", "avg ms", "median ms", "p95 ms", "p99 ms", "min ms", "max ms"),
+        tuple(rows),
+    )
 
 
 def main() -> None:
