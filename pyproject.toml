@@ -1,7 +1,29 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "relayx"
 version = "1.0.0"
 description = "Message-oriented encrypted HTTP relay over HTTP/1.1"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "RelayX Maintainers" }]
+keywords = ["http", "relay", "encryption", "chacha20-poly1305", "fastapi"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: Proxy Servers",
+  "Topic :: Security :: Cryptography",
+]
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.110,<1.0",
@@ -13,10 +35,17 @@ dependencies = [
   "pydantic-settings>=2.2,<3.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/devcoai68-bot/RelayX"
+Repository = "https://github.com/devcoai68-bot/RelayX"
+Issues = "https://github.com/devcoai68-bot/RelayX/issues"
+Changelog = "https://github.com/devcoai68-bot/RelayX/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
   "bandit>=1.7,<2.0",
   "black>=24,<27",
+  "build>=1.2,<2.0",
   "isort>=5,<9",
   "mypy>=1.10,<2.0",
   "pip-audit>=2.7,<3.0",
@@ -25,6 +54,7 @@ dev = [
   "pytest-asyncio>=0.23,<2.0",
   "pytest-cov>=5,<8",
   "ruff>=0.5,<1.0",
+  "twine>=5,<7",
 ]
 
 [project.scripts]
@@ -34,6 +64,9 @@ relayx = "relayx.cli:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "asyncio: mark tests that require pytest-asyncio",
+]
 
 
 [tool.black]
@@ -81,4 +114,9 @@ directory = "htmlcov"
 output = "coverage.xml"
 
 [tool.bandit]
-exclude_dirs = [".venv", "htmlcov"]
+exclude_dirs = [".venv", "htmlcov", "tests"]
+
+[tool.setuptools.packages.find]
+include = ["relayx*"]
+exclude = ["benchmarks*", "tests*"]
+

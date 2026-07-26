@@ -19,7 +19,7 @@ Thank you for improving RelayX. This project is a secure HTTP application relay 
 3. Install development dependencies:
 
    ```sh
-   python -m pip install -e '.[dev]'
+   python -m pip install -e . -r requirements-dev.txt
    ```
 
 4. Install pre-commit hooks:

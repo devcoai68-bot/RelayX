@@ -274,3 +274,7 @@ curl -f https://relay.example.com/ready
 - `/ready` returns 503: confirm the RelayX process initialized and the forwarder client is open.
 - Large transfers fail: compare nginx `client_max_body_size` with RelayX carrier and body limits.
 - Timeouts: check `RELAYX_TIMEOUT_SECONDS`, nginx proxy timeouts, and upstream responsiveness.
+
+## Dependency files
+
+RelayX keeps canonical dependency ranges in `pyproject.toml`. The `requirements.txt` file mirrors runtime dependencies for scanners, Docker-adjacent tooling, and operators that prefer requirements-based installation. The `requirements-dev.txt` file adds CI and local development tools. A fully pinned lock file is intentionally not committed for v1.0.0 because RelayX is a library-style Python package intended to be resolved by the target environment; deployment operators may generate their own lock with their approved index and platform constraints.
