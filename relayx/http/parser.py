@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 from relayx.errors import ProtocolError, RequestTooLargeError
 from relayx.http.messages import HTTPRequestMessage
+from relayx.protocol.models import validate_header_list, validate_http_token
 
 
 async def read_request(
@@ -17,14 +18,16 @@ async def read_request(
         method, target, version = lines[0].split(" ", 2)
     except ValueError as exc:
         raise ProtocolError("malformed request line") from exc
+    validate_http_token(method, "method")
     if version != "HTTP/1.1" or method.upper() == "CONNECT":
         raise ProtocolError("unsupported request")
     headers = []
     for line in lines[1:]:
-        if not line or ":" not in line:
+        if not line or line[0] in " \t" or ":" not in line:
             raise ProtocolError("malformed header")
         name, value = line.split(":", 1)
         headers.append((name, value.lstrip(" \t")))
+    validate_header_list(tuple(headers))
     if any(n.lower() == "transfer-encoding" for n, _ in headers):
         raise ProtocolError("transfer encoding is unsupported")
     body_len = _content_length(headers)
@@ -46,23 +49,39 @@ def _content_length(headers: list[tuple[str, str]]) -> int:
     return int(value)
 
 
-def _target(method: str, target: str, headers, body: bytes) -> HTTPRequestMessage:
-    host_header = next((v for n, v in headers if n.lower() == "host"), "")
+def _single_host_header(headers: tuple[tuple[str, str], ...]) -> str:
+    values = [value for name, value in headers if name.lower() == "host"]
+    if len(values) != 1:
+        raise ProtocolError("exactly one Host header is required")
+    return values[0]
+
+
+def _target(
+    method: str, target: str, headers: tuple[tuple[str, str], ...], body: bytes
+) -> HTTPRequestMessage:
+    host_header = _single_host_header(headers)
     if target.startswith("http://") or target.startswith("https://"):
         parsed = urlsplit(target)
-        scheme, host, port, path, query = (
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ProtocolError("invalid target port") from exc
+        scheme, host, path, query = (
             parsed.scheme,
             parsed.hostname or "",
-            parsed.port,
             parsed.path or "/",
             parsed.query,
         )
+        authority = parsed.netloc.rsplit("@", 1)[-1].lower()
+        if authority != host_header.lower():
+            raise ProtocolError("absolute-form target authority must match Host header")
     else:
-        if not host_header:
-            raise ProtocolError("Host header is required")
         scheme = "http"
         host, _, port_s = host_header.partition(":")
-        port = int(port_s) if port_s else None
+        try:
+            port = int(port_s) if port_s else None
+        except ValueError as exc:
+            raise ProtocolError("invalid Host port") from exc
         parsed = urlsplit(target)
         path, query = parsed.path or "/", parsed.query
     return HTTPRequestMessage(method, scheme, host, port, path, query, headers, body)

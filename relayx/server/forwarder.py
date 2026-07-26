@@ -44,7 +44,7 @@ class Forwarder:
                     request.request_id,
                     response.status_code,
                     response.reason_phrase,
-                    tuple(response.headers.multi_items()),
+                    filter_forward_headers(tuple(response.headers.multi_items())),
                     bytes(chunks),
                 )
         except httpx.TimeoutException:
