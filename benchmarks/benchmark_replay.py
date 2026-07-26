@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import time
 
+from benchmarks.common import (
+    REPLAY_CACHE_SIZES,
+    BenchmarkResult,
+    current_rss_bytes,
+    format_bytes,
+    parse_common_args,
+    run_profile,
+)
 from relayx.protocol.replay import ReplayCache
-from benchmarks.common import REPLAY_CACHE_SIZES, BenchmarkResult, format_bytes, parse_common_args, run_profile, current_rss_bytes
 
 
 def _nonce(index: int) -> bytes:
@@ -14,7 +21,11 @@ def benchmark(iterations: int, warmup: int) -> BenchmarkResult:
     rows = []
     now_ms = int(time.time() * 1000)
     for target_size in REPLAY_CACHE_SIZES:
-        cache = ReplayCache(window_seconds=300, max_entries=target_size + iterations + warmup + 10, allowed_clock_skew_seconds=30)
+        cache = ReplayCache(
+            window_seconds=300,
+            max_entries=target_size + iterations + warmup + 10,
+            allowed_clock_skew_seconds=30,
+        )
         start_rss = current_rss_bytes()
         start = time.perf_counter()
         for index in range(target_size):
@@ -32,8 +43,28 @@ def benchmark(iterations: int, warmup: int) -> BenchmarkResult:
         purge_start = time.perf_counter()
         cache._purge(now_ms + 301_000)
         purge_seconds = time.perf_counter() - purge_start
-        rows.append((f"{target_size:,}", f"{iterations / insert_seconds:.2f}", f"{iterations / lookup_seconds:.2f}", f"{preload_seconds:.3f}", f"{purge_seconds:.3f}", format_bytes(memory_bytes)))
-    return BenchmarkResult("replay", ("entries", "insert ops/s", "lookup ops/s", "preload s", "purge s", "rss growth"), tuple(rows))
+        rows.append(
+            (
+                f"{target_size:,}",
+                f"{iterations / insert_seconds:.2f}",
+                f"{iterations / lookup_seconds:.2f}",
+                f"{preload_seconds:.3f}",
+                f"{purge_seconds:.3f}",
+                format_bytes(memory_bytes),
+            )
+        )
+    return BenchmarkResult(
+        "replay",
+        (
+            "entries",
+            "insert ops/s",
+            "lookup ops/s",
+            "preload s",
+            "purge s",
+            "rss growth",
+        ),
+        tuple(rows),
+    )
 
 
 def main() -> None:

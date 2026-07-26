@@ -1,0 +1,34 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: ["relayx", "benchmarks", "tests"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.5
+    hooks:
+      - id: ruff
+        args: ["--fix", "relayx", "benchmarks", "tests"]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        args: ["relayx", "benchmarks", "tests"]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.0
+    hooks:
+      - id: mypy
+        args: ["relayx", "benchmarks", "tests"]
+        additional_dependencies:
+          - fastapi
+          - uvicorn
+          - httpx
+          - cryptography
+          - msgpack
+          - zstandard
+          - pydantic-settings
+          - pytest
+          - pytest-asyncio

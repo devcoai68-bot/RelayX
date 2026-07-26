@@ -1,10 +1,9 @@
-import asyncio
 import base64
+
 import pytest
 from pydantic import ValidationError
 
 from relayx.config import RelaySettings
-from relayx.crypto.aead import seal
 from relayx.errors import ProtocolError, RequestTooLargeError
 from relayx.http.parser import read_request
 from relayx.pipeline import decode_message, encode_message
@@ -62,6 +61,7 @@ def test_codec_rejects_primitive_type_mismatch():
         "body": b"",
     }
     import msgpack
+
     with pytest.raises(Exception):
         codec.loads(msgpack.packb(msg, use_bin_type=True))
 
@@ -75,12 +75,14 @@ def test_decoded_request_body_size_limit():
 class FakeReader:
     def __init__(self, data: bytes):
         self.data = bytearray(data)
+
     async def read(self, n: int) -> bytes:
         if not self.data:
             return b""
         out = self.data[:n]
         del self.data[:n]
         return bytes(out)
+
     async def readexactly(self, n: int) -> bytes:
         out = self.data[:n]
         del self.data[:n]
@@ -97,6 +99,7 @@ async def test_bounded_http_header_reading_rejects_before_terminator():
 class FakeRequest:
     def __init__(self, chunks):
         self.chunks = chunks
+
     async def stream(self):
         for chunk in self.chunks:
             yield chunk
@@ -111,14 +114,19 @@ async def test_bounded_carrier_body_reading():
 class FakeStreamResponse:
     status_code = 200
     reason_phrase = "OK"
+
     class Headers:
         def multi_items(self):
             return []
+
     headers = Headers()
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, *args):
         return False
+
     async def aiter_bytes(self):
         yield b"aa"
         yield b"bb"
@@ -137,6 +145,7 @@ async def test_streaming_upstream_response_size_enforcement():
 
 def test_replay_error_mapping():
     from relayx.errors import ReplayDetectedError
+
     err = _error_from_exception(ReplayDetectedError("duplicate"))
     assert err.error_code == "replay_detected"
 
@@ -147,17 +156,22 @@ def test_config_range_and_secret_validation():
     with pytest.raises(ValidationError):
         RelaySettings(auth_token="x", encryption_key=KEY_B64, max_request_body_bytes=0)
 
+
 class FakeCarrierResponse:
     def __init__(self, content: bytes):
         self.content = content
+
     def raise_for_status(self):
         return None
+
 
 class FakeCarrierClient:
     def __init__(self, content: bytes):
         self.content = content
+
     async def post(self, *args, **kwargs):
         return FakeCarrierResponse(self.content)
+
 
 class FakeSettings:
     auth_token = "auth"
@@ -172,6 +186,7 @@ class FakeSettings:
     max_decompressed_bytes = 1024 * 1024
     max_request_body_bytes = 1024 * 1024
     max_response_body_bytes = 1024 * 1024
+
     @property
     def encryption_key_bytes(self):
         return KEY
@@ -181,7 +196,10 @@ class FakeSettings:
 async def test_relay_client_validates_response_request_id_correlation():
     from relayx.client.relay_client import RelayClient
     from relayx.protocol.models import RelayResponse
-    mismatched = encode_message(RelayResponse("2" * 32, 200, "OK", tuple(), b""), KEY, compression_enabled=False)
+
+    mismatched = encode_message(
+        RelayResponse("2" * 32, 200, "OK", tuple(), b""), KEY, compression_enabled=False
+    )
     client = RelayClient(FakeSettings(), FakeCarrierClient(mismatched))
     with pytest.raises(ValueError):
         await client.send(request())
@@ -189,6 +207,7 @@ async def test_relay_client_validates_response_request_id_correlation():
 
 def test_content_length_validation_rejects_duplicates_and_invalid_values():
     from relayx.http.parser import _content_length
+
     with pytest.raises(ProtocolError):
         _content_length([("Content-Length", "1"), ("Content-Length", "1")])
     with pytest.raises(ProtocolError):
@@ -204,6 +223,13 @@ def test_replay_cache_validates_nonce_size():
 
 def test_error_mapping_preserves_request_id_when_available():
     from relayx.errors import RequestTooLargeError
+
     err = _error_from_exception(RequestTooLargeError("large"), REQ_ID)
     assert err.request_id == REQ_ID
     assert err.error_code == "request_too_large"
+
+
+@pytest.mark.asyncio
+async def test_limited_body_rejects_oversized_chunk_before_buffering():
+    with pytest.raises(Exception):
+        await read_limited_body(FakeRequest([b"a" * 10]), max_bytes=3)

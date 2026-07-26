@@ -14,7 +14,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+dev = [
+  "bandit",
+  "black",
+  "isort",
+  "mypy",
+  "pip-audit",
+  "pre-commit",
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+  "ruff",
+]
 
 [project.scripts]
 relayx = "relayx.cli:main"
@@ -23,3 +34,51 @@ relayx = "relayx.cli:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+py_version = 312
+known_first_party = ["relayx", "benchmarks", "tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["relayx", "benchmarks", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E501", "E731", "F403", "F405"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["relayx", "benchmarks", "tests"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+disable_error_code = ["arg-type", "assignment", "call-arg", "union-attr", "var-annotated"]
+
+[tool.coverage.run]
+branch = true
+source = ["relayx", "benchmarks"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.bandit]
+exclude_dirs = [".venv", "htmlcov"]

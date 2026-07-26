@@ -3,6 +3,7 @@
 The benchmark package is intentionally isolated from production code. It imports
 RelayX modules to measure them, but never changes protocol behavior.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,8 +24,21 @@ from typing import Any
 
 from relayx.config import RelaySettings
 
-PAYLOAD_SIZES: tuple[int, ...] = (1024, 10 * 1024, 100 * 1024, 1024 * 1024, 4 * 1024 * 1024, 8 * 1024 * 1024, 16 * 1024 * 1024)
-LARGE_PAYLOAD_SIZES: tuple[int, ...] = (1024 * 1024, 4 * 1024 * 1024, 8 * 1024 * 1024, 16 * 1024 * 1024)
+PAYLOAD_SIZES: tuple[int, ...] = (
+    1024,
+    10 * 1024,
+    100 * 1024,
+    1024 * 1024,
+    4 * 1024 * 1024,
+    8 * 1024 * 1024,
+    16 * 1024 * 1024,
+)
+LARGE_PAYLOAD_SIZES: tuple[int, ...] = (
+    1024 * 1024,
+    4 * 1024 * 1024,
+    8 * 1024 * 1024,
+    16 * 1024 * 1024,
+)
 CONCURRENCY_LEVELS: tuple[int, ...] = (1, 10, 50, 100, 200, 500)
 REPLAY_CACHE_SIZES: tuple[int, ...] = (10_000, 100_000, 500_000, 1_000_000)
 BENCHMARK_KEY = base64.b64encode(b"b" * 32).decode()
@@ -40,12 +54,29 @@ class BenchmarkResult:
         return format_table(self.columns, self.rows)
 
 
-def parse_common_args(description: str, default_iterations: int = 20) -> argparse.Namespace:
+def parse_common_args(
+    description: str, default_iterations: int = 20
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("--iterations", type=int, default=default_iterations, help="Number of measured iterations per scenario.")
-    parser.add_argument("--warmup", type=int, default=3, help="Warmup iterations before measurement.")
-    parser.add_argument("--profile", action="store_true", help="Run the benchmark under cProfile and write a .prof text report.")
-    parser.add_argument("--profile-output", default="benchmark.prof.txt", help="Path for cProfile text output when --profile is used.")
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=default_iterations,
+        help="Number of measured iterations per scenario.",
+    )
+    parser.add_argument(
+        "--warmup", type=int, default=3, help="Warmup iterations before measurement."
+    )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Run the benchmark under cProfile and write a .prof text report.",
+    )
+    parser.add_argument(
+        "--profile-output",
+        default="benchmark.prof.txt",
+        help="Path for cProfile text output when --profile is used.",
+    )
     return parser.parse_args()
 
 
@@ -110,10 +141,17 @@ def format_table(columns: tuple[str, ...], rows: Iterable[tuple[Any, ...]]) -> s
     rendered = [[str(cell) for cell in row] for row in rows]
     widths = [len(column) for column in columns]
     for row in rendered:
-        widths = [max(width, len(cell)) for width, cell in zip(widths, row, strict=True)]
-    header = " | ".join(column.ljust(width) for column, width in zip(columns, widths, strict=True))
+        widths = [
+            max(width, len(cell)) for width, cell in zip(widths, row, strict=True)
+        ]
+    header = " | ".join(
+        column.ljust(width) for column, width in zip(columns, widths, strict=True)
+    )
     divider = "-+-".join("-" * width for width in widths)
-    body = [" | ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)) for row in rendered]
+    body = [
+        " | ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True))
+        for row in rendered
+    ]
     return "\n".join([header, divider, *body])
 
 
@@ -121,12 +159,16 @@ def run_profile(func: Callable[[], Any], output_path: str | os.PathLike[str]) ->
     profiler = cProfile.Profile()
     result = profiler.runcall(func)
     buffer = io.StringIO()
-    pstats.Stats(profiler, stream=buffer).strip_dirs().sort_stats("cumtime").print_stats(50)
+    pstats.Stats(profiler, stream=buffer).strip_dirs().sort_stats(
+        "cumtime"
+    ).print_stats(50)
     Path(output_path).write_text(buffer.getvalue())
     return result
 
 
-async def measure_async(call: Callable[[], Awaitable[Any]], iterations: int, warmup: int = 0) -> tuple[list[float], list[Any]]:
+async def measure_async(
+    call: Callable[[], Awaitable[Any]], iterations: int, warmup: int = 0
+) -> tuple[list[float], list[Any]]:
     for _ in range(warmup):
         await call()
     samples: list[float] = []
@@ -151,7 +193,11 @@ def measure_allocations(func: Callable[[], Any]) -> tuple[Any, int, int]:
     result = func()
     current, peak = tracemalloc.get_traced_memory()
     snapshot_after = tracemalloc.take_snapshot()
-    allocation_count = sum(stat.count for stat in snapshot_after.compare_to(snapshot_before, "lineno") if stat.count > 0)
+    allocation_count = sum(
+        stat.count
+        for stat in snapshot_after.compare_to(snapshot_before, "lineno")
+        if stat.count > 0
+    )
     tracemalloc.stop()
     return result, peak, allocation_count
 
@@ -161,4 +207,4 @@ def run_async(coro: Awaitable[Any]) -> Any:
 
 
 def hex_request_id(prefix: int, index: int) -> str:
-    return f'{prefix:08x}{index:024x}'[-32:]
+    return f"{prefix:08x}{index:024x}"[-32:]

@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import time
 
-from relayx.crypto.aead import open_packet, seal
+from benchmarks.common import (
+    PAYLOAD_SIZES,
+    BenchmarkResult,
+    default_settings,
+    deterministic_payload,
+    format_bytes,
+    parse_common_args,
+    run_profile,
+)
 from relayx.constants import TYPE_REQUEST
-from benchmarks.common import PAYLOAD_SIZES, BenchmarkResult, default_settings, deterministic_payload, format_bytes, parse_common_args, run_profile
+from relayx.crypto.aead import open_packet, seal
 
 
 def benchmark(iterations: int, warmup: int) -> BenchmarkResult:
@@ -23,8 +31,20 @@ def benchmark(iterations: int, warmup: int) -> BenchmarkResult:
             open_packet(packet, key, size + 1024)
         decrypt_seconds = time.perf_counter() - start
         mb = (size * iterations) / (1024 * 1024)
-        rows.append((format_bytes(size), f"{mb / encrypt_seconds:.2f}", f"{mb / decrypt_seconds:.2f}", f"{encrypt_seconds / iterations * 1000:.3f}", f"{decrypt_seconds / iterations * 1000:.3f}"))
-    return BenchmarkResult("AEAD", ("payload", "encrypt MiB/s", "decrypt MiB/s", "encrypt ms", "decrypt ms"), tuple(rows))
+        rows.append(
+            (
+                format_bytes(size),
+                f"{mb / encrypt_seconds:.2f}",
+                f"{mb / decrypt_seconds:.2f}",
+                f"{encrypt_seconds / iterations * 1000:.3f}",
+                f"{decrypt_seconds / iterations * 1000:.3f}",
+            )
+        )
+    return BenchmarkResult(
+        "AEAD",
+        ("payload", "encrypt MiB/s", "decrypt MiB/s", "encrypt ms", "decrypt ms"),
+        tuple(rows),
+    )
 
 
 def main() -> None:

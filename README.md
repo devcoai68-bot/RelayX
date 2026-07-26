@@ -1,6 +1,76 @@
 # RelayX
 
-RelayX is a message-oriented encrypted HTTP request relay for restrictive HTTP/1.1-only environments. Version 1 is fully buffered and is not a TCP tunnel, SOCKS proxy, or CONNECT proxy.
+RelayX is a minimal encrypted HTTP application relay for environments that only forward ordinary HTTP/1.1 POST requests. It is message-oriented: complete HTTP requests and complete HTTP responses are serialized, optionally compressed, encrypted, and carried inside `application/octet-stream` POST bodies.
+
+RelayX is not a VPN, SOCKS proxy, CONNECT tunnel, TCP tunnel, WebSocket transport, HTTP/2 transport, or streaming proxy.
+
+## Quick start
+
+Install with Python 3.12 or newer:
+
+```sh
+python3.12 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
+```
+
+Generate an encryption key:
+
+```sh
+python - <<'PY'
+import base64, os
+print(base64.b64encode(os.urandom(32)).decode())
+PY
+```
+
+Start a RelayX server in one terminal:
+
+```sh
+export RELAYX_AUTH_TOKEN='dev-token-change-me'
+export RELAYX_ENCRYPTION_KEY='<base64-32-byte-key>'
+relayx server
+```
+
+Start the local client proxy in another terminal:
+
+```sh
+export RELAYX_AUTH_TOKEN='dev-token-change-me'
+export RELAYX_ENCRYPTION_KEY='<same-base64-32-byte-key>'
+export RELAYX_RELAY_URL='http://127.0.0.1:8000/relay'
+relayx client
+```
+
+Send a request through the local proxy:
+
+```sh
+curl -i --proxy http://127.0.0.1:8080 http://example.com/
+```
+
+Check server health:
+
+```sh
+curl -i http://127.0.0.1:8000/health
+curl -i http://127.0.0.1:8000/ready
+```
+
+## How RelayX works
+
+1. A local application sends a normal HTTP request to the RelayX client.
+2. The client parses the complete HTTP/1.1 request.
+3. RelayX creates a strict RelayRequest message.
+4. The message is serialized with MsgPack.
+5. The serialized bytes are optionally compressed with zstd.
+6. The payload is encrypted with ChaCha20-Poly1305.
+7. The encrypted packet is sent as an ordinary HTTP POST to the relay server.
+8. The server authenticates `Authorization: Bearer <token>`, decrypts, validates, checks replay, forwards with `httpx`, and returns an encrypted RelayResponse or RelayError.
+
+For production installation, operations, and testing details, see:
+
+- `docs/INSTALL.md`
+- `docs/OPERATIONS.md`
+- `docs/TESTING.md`
+- `docs/SECURITY_AUDIT.md`
 
 ## Protocol v1
 
@@ -50,6 +120,21 @@ During FastAPI lifespan shutdown, RelayX stops after allowing outstanding relay 
 ### Security considerations and limitations
 
 RelayX is not a VPN, SOCKS proxy, CONNECT tunnel, TCP tunnel, WebSocket transport, or streaming relay. It relays complete HTTP requests and responses only. Structured logs intentionally exclude bearer tokens, encryption keys, Authorization headers, and request/response bodies. The replay cache is in memory and single-process only; do not run multiple independent server processes behind one endpoint unless you accept that replay detection is scoped to each process or provide sticky routing at a higher layer.
+
+
+## Quality assurance
+
+CI runs linting, formatting checks, type checking, compileall, unit tests, integration tests, benchmark validation, security checks, and a Docker image build on every push and pull request. Coverage can be generated locally with:
+
+```sh
+pytest --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html
+```
+
+This creates `coverage.xml` and an HTML report in `htmlcov/`. To publish a coverage badge, enable a coverage service such as Codecov or Coveralls for the repository and add its generated Markdown badge near the top of this README, for example:
+
+```md
+[![Coverage](https://codecov.io/gh/<owner>/<repo>/branch/main/graph/badge.svg)](https://codecov.io/gh/<owner>/<repo>)
+```
 
 ## Performance validation
 

@@ -1,7 +1,11 @@
 """Buffered HTTP message containers."""
+
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 from relayx.protocol.models import HeaderList
+
 
 @dataclass(frozen=True, slots=True)
 class HTTPRequestMessage:
@@ -13,6 +17,7 @@ class HTTPRequestMessage:
     query: str
     headers: HeaderList
     body: bytes
+
 
 @dataclass(frozen=True, slots=True)
 class HTTPResponseMessage:

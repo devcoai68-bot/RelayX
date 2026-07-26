@@ -41,8 +41,27 @@ def test_report_to_markdown_contains_environment_methodology_and_results():
 
 
 def test_quick_baseline_runner_returns_all_benchmark_sections(monkeypatch):
-    monkeypatch.setattr("benchmarks.run_baseline.capture_environment", lambda: {"os": "test", "machine": "test", "cpu": "test", "cpu_count": 1, "ram": "1.00 GiB", "python": "3.12", "packages": {}, "relayx_git_commit": "abc"})
-    args = Namespace(iterations=1, warmup=0, throughput_iterations=1, replay_iterations=1, memory_iterations=1, full=False)
+    monkeypatch.setattr(
+        "benchmarks.run_baseline.capture_environment",
+        lambda: {
+            "os": "test",
+            "machine": "test",
+            "cpu": "test",
+            "cpu_count": 1,
+            "ram": "1.00 GiB",
+            "python": "3.12",
+            "packages": {},
+            "relayx_git_commit": "abc",
+        },
+    )
+    args = Namespace(
+        iterations=1,
+        warmup=0,
+        throughput_iterations=1,
+        replay_iterations=1,
+        memory_iterations=1,
+        full=False,
+    )
 
     report = run_baseline(args)
 

@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import time
 
-from benchmarks.common import hex_request_id, LARGE_PAYLOAD_SIZES, BenchmarkResult, deterministic_payload, format_bytes, parse_common_args, run_async, run_profile, summarize_latencies
+from benchmarks.common import (
+    LARGE_PAYLOAD_SIZES,
+    BenchmarkResult,
+    deterministic_payload,
+    format_bytes,
+    hex_request_id,
+    parse_common_args,
+    run_async,
+    run_profile,
+    summarize_latencies,
+)
 from benchmarks.relay_harness import RelayBenchmarkHarness
 
 
@@ -21,12 +31,23 @@ async def benchmark_async(iterations: int, warmup: int) -> BenchmarkResult:
                 if len(response.body) != size:
                     raise RuntimeError("unexpected response size")
             summary = summarize_latencies(samples)
-            rows.append((format_bytes(size), f"{summary['median_ms']:.3f}", f"{summary['p95_ms']:.3f}", f"{summary['max_ms']:.3f}"))
-    return BenchmarkResult("large-payloads", ("request body", "median ms", "p95 ms", "max ms"), tuple(rows))
+            rows.append(
+                (
+                    format_bytes(size),
+                    f"{summary['median_ms']:.3f}",
+                    f"{summary['p95_ms']:.3f}",
+                    f"{summary['max_ms']:.3f}",
+                )
+            )
+    return BenchmarkResult(
+        "large-payloads", ("request body", "median ms", "p95 ms", "max ms"), tuple(rows)
+    )
 
 
 def main() -> None:
-    args = parse_common_args("Benchmark RelayX large request body behavior", default_iterations=5)
+    args = parse_common_args(
+        "Benchmark RelayX large request body behavior", default_iterations=5
+    )
     runner = lambda: run_async(benchmark_async(args.iterations, args.warmup))
     result = run_profile(runner, args.profile_output) if args.profile else runner()
     print(result.as_table())
