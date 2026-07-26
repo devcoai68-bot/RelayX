@@ -4,22 +4,41 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   quality:
-    name: Quality checks
+    name: Quality checks (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
 
       - name: Install package with development dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+        run: python -m pip install --upgrade pip && python -m pip install -e . -r requirements-dev.txt
 
       - name: Lint with ruff
         run: ruff check relayx benchmarks tests
@@ -40,79 +59,97 @@ jobs:
         run: pytest tests/unit --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html
 
       - name: Upload coverage reports
+        if: always() && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
           path: |
             coverage.xml
             htmlcov/
+          if-no-files-found: error
 
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
-
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
       - name: Install package with development dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
-
+        run: python -m pip install --upgrade pip && python -m pip install -e . -r requirements-dev.txt
       - name: Run integration tests
         run: pytest tests/integration
 
   benchmark-validation:
     name: Benchmark validation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
-
-      - name: Install package with development dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
-
-      - name: Run benchmark validation tests
-        run: pytest tests/benchmark_validation
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
+      - run: python -m pip install --upgrade pip && python -m pip install -e . -r requirements-dev.txt
+      - run: pytest tests/benchmark_validation
 
   security:
     name: Security checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
-
-      - name: Install package with development dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
-
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
+      - run: python -m pip install --upgrade pip && python -m pip install -e . -r requirements-dev.txt
       - name: Run bandit
-        run: bandit -r relayx benchmarks tests
-
+        run: bandit -r relayx benchmarks -c pyproject.toml
       - name: Run pip-audit
-        run: pip-audit
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
+
+  package:
+    name: Package build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
+      - run: python -m pip install --upgrade pip && python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-dist
+          path: dist/*
+          if-no-files-found: error
 
   docker:
     name: Docker build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build -t relayx:ci .

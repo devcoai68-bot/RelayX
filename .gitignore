@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test, type-check, and coverage artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Benchmark/profiling generated artifacts
+*.prof
+*.prof.txt
+benchmarks/results/*.tmp
+benchmarks/results/baseline-*.local.json
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

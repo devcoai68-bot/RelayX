@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "httpx"
+          - "cryptography"
+          - "msgpack"
+          - "zstandard"
+          - "pydantic-settings"
+      python-dev-tools:
+        patterns:
+          - "bandit"
+          - "black"
+          - "build"
+          - "isort"
+          - "mypy"
+          - "pip-audit"
+          - "pre-commit"
+          - "pytest*"
+          - "ruff"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

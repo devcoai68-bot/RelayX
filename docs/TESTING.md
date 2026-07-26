@@ -6,7 +6,7 @@
 python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
+python -m pip install -e . -r requirements-dev.txt
 ```
 
 Expected result: the package installs with pytest, pytest-asyncio, pytest-cov, Ruff, Black, isort, mypy, Bandit, and pip-audit.
@@ -53,7 +53,7 @@ These tests validate benchmark helpers and baseline export shape without relying
 pytest
 ```
 
-Expected result: all tests pass when development dependencies, including `pytest-asyncio`, are installed.
+Expected result: all tests pass when development dependencies are installed from `requirements-dev.txt`. Async tests require `pytest-asyncio`; if it is missing, pytest reports unknown `asyncio` marks and async test failures before RelayX code runs.
 
 ## Coverage
 
