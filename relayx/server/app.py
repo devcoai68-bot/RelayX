@@ -1,4 +1,5 @@
 """FastAPI app factory."""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,7 +17,10 @@ from relayx.server.forwarder import Forwarder
 
 async def _wait_for_outstanding(app: FastAPI, timeout: float) -> None:
     deadline = asyncio.get_running_loop().time() + timeout
-    while app.state.outstanding_requests > 0 and asyncio.get_running_loop().time() < deadline:
+    while (
+        app.state.outstanding_requests > 0
+        and asyncio.get_running_loop().time() < deadline
+    ):
         await asyncio.sleep(0.05)
 
 
@@ -24,7 +28,11 @@ def create_app(settings: RelaySettings | None = None) -> FastAPI:
     settings = settings or RelaySettings()
     configure_logging(settings.log_level)
     client = httpx.AsyncClient(timeout=settings.timeout_seconds)
-    replay_cache = ReplayCache(settings.replay_window_seconds, settings.replay_cache_max_entries, settings.allowed_clock_skew_seconds)
+    replay_cache = ReplayCache(
+        settings.replay_window_seconds,
+        settings.replay_cache_max_entries,
+        settings.allowed_clock_skew_seconds,
+    )
     forwarder = Forwarder(client, settings.max_response_body_bytes)
 
     @asynccontextmanager

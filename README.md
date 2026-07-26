@@ -51,6 +51,21 @@ During FastAPI lifespan shutdown, RelayX stops after allowing outstanding relay 
 
 RelayX is not a VPN, SOCKS proxy, CONNECT tunnel, TCP tunnel, WebSocket transport, or streaming relay. It relays complete HTTP requests and responses only. Structured logs intentionally exclude bearer tokens, encryption keys, Authorization headers, and request/response bodies. The replay cache is in memory and single-process only; do not run multiple independent server processes behind one endpoint unless you accept that replay detection is scoped to each process or provide sticky routing at a higher layer.
 
+
+## Quality assurance
+
+CI runs linting, formatting checks, type checking, compileall, unit tests, integration tests, benchmark validation, security checks, and a Docker image build on every push and pull request. Coverage can be generated locally with:
+
+```sh
+pytest --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html
+```
+
+This creates `coverage.xml` and an HTML report in `htmlcov/`. To publish a coverage badge, enable a coverage service such as Codecov or Coveralls for the repository and add its generated Markdown badge near the top of this README, for example:
+
+```md
+[![Coverage](https://codecov.io/gh/<owner>/<repo>/branch/main/graph/badge.svg)](https://codecov.io/gh/<owner>/<repo>)
+```
+
 ## Performance validation
 
 Phase 5 benchmark code lives under `benchmarks/` and is intentionally separate from production RelayX modules. The scripts import RelayX to measure current behavior but do not change protocol encoding, encryption, compression, replay protection, forwarding, parsing, or server/client behavior.

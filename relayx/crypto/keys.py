@@ -1,7 +1,12 @@
 """Encryption key loading."""
+
 from __future__ import annotations
-import base64, binascii
+
+import base64
+import binascii
+
 from relayx.errors import ConfigError
+
 
 def decode_encryption_key(value: str) -> bytes:
     try:

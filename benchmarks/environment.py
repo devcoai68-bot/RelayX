@@ -1,4 +1,5 @@
 """Environment capture for reproducible RelayX benchmark baselines."""
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -10,7 +11,15 @@ from typing import Any
 
 from benchmarks.common import format_bytes
 
-_PACKAGES = ("fastapi", "uvicorn", "httpx", "cryptography", "msgpack", "zstandard", "pydantic-settings")
+_PACKAGES = (
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "cryptography",
+    "msgpack",
+    "zstandard",
+    "pydantic-settings",
+)
 
 
 def capture_environment(repo_root: Path | None = None) -> dict[str, Any]:
@@ -39,7 +48,13 @@ def _package_versions() -> dict[str, str]:
 
 def _git_commit(repo_root: Path) -> str:
     try:
-        completed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo_root, check=True, capture_output=True, text=True)
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return completed.stdout.strip()

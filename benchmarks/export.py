@@ -1,4 +1,5 @@
 """Export helpers for RelayX benchmark baselines."""
+
 from __future__ import annotations
 
 import json
@@ -44,28 +45,39 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
     ]
     for name, version in environment["packages"].items():
         lines.append(f"- `{name}`: `{version}`")
-    lines.extend([
-        "",
-        "## Methodology",
-        "",
-        "These benchmarks run from the isolated `benchmarks/` package and measure existing RelayX behavior without changing production code or protocol semantics.",
-        f"Common iterations: `{report['parameters']['iterations']}`",
-        f"Common warmup iterations: `{report['parameters']['warmup']}`",
-        f"Mode: `{report['parameters']['mode']}`",
-        "",
-        "## Results",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Methodology",
+            "",
+            "These benchmarks run from the isolated `benchmarks/` package and measure existing RelayX behavior without changing production code or protocol semantics.",
+            f"Common iterations: `{report['parameters']['iterations']}`",
+            f"Common warmup iterations: `{report['parameters']['warmup']}`",
+            f"Mode: `{report['parameters']['mode']}`",
+            "",
+            "## Results",
+            "",
+        ]
+    )
     for result in results:
-        lines.extend([f"### {result['name']}", "", _markdown_table(tuple(result["columns"]), result["rows"]), ""])
-    lines.extend([
-        "## Limitations",
-        "",
-        "- Results are comparable only across runs with the same benchmark command, host class, CPU limits, Python version, dependency versions, and RelayX settings.",
-        "- Timing benchmarks are measurements, not pass/fail tests; use repeated runs to identify meaningful changes.",
-        "- In-process ASGI benchmarks remove external network variability and are best for RelayX baseline comparisons, not public internet latency estimates.",
-        "- Replay-cache and large-payload results depend strongly on available memory and host load.",
-    ])
+        lines.extend(
+            [
+                f"### {result['name']}",
+                "",
+                _markdown_table(tuple(result["columns"]), result["rows"]),
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Limitations",
+            "",
+            "- Results are comparable only across runs with the same benchmark command, host class, CPU limits, Python version, dependency versions, and RelayX settings.",
+            "- Timing benchmarks are measurements, not pass/fail tests; use repeated runs to identify meaningful changes.",
+            "- In-process ASGI benchmarks remove external network variability and are best for RelayX baseline comparisons, not public internet latency estimates.",
+            "- Replay-cache and large-payload results depend strongly on available memory and host load.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 

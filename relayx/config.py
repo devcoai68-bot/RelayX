@@ -1,9 +1,13 @@
 """RelayX settings."""
+
 from __future__ import annotations
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from relayx.constants import *
 from relayx.crypto.keys import decode_encryption_key
+
 
 class RelaySettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RELAYX_")
@@ -41,7 +45,15 @@ class RelaySettings(BaseSettings):
             raise ValueError("ports must be between 1 and 65535")
         return value
 
-    @field_validator("replay_window_seconds", "replay_cache_max_entries", "max_decompressed_bytes", "max_carrier_body_bytes", "max_request_body_bytes", "max_response_body_bytes", "max_header_bytes")
+    @field_validator(
+        "replay_window_seconds",
+        "replay_cache_max_entries",
+        "max_decompressed_bytes",
+        "max_carrier_body_bytes",
+        "max_request_body_bytes",
+        "max_response_body_bytes",
+        "max_header_bytes",
+    )
     @classmethod
     def _positive_int(cls, value: int) -> int:
         if value <= 0:
@@ -60,7 +72,9 @@ class RelaySettings(BaseSettings):
     def _valid_log_level(cls, value: str) -> str:
         normalized = value.upper()
         if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
-            raise ValueError("log level must be DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+            raise ValueError(
+                "log level must be DEBUG, INFO, WARNING, ERROR, or CRITICAL"
+            )
         return normalized
 
     @field_validator("timeout_seconds")
@@ -73,7 +87,9 @@ class RelaySettings(BaseSettings):
     @model_validator(mode="after")
     def _separate_secrets(self) -> "RelaySettings":
         if self.auth_token == self.encryption_key:
-            raise ValueError("RELAYX_AUTH_TOKEN and RELAYX_ENCRYPTION_KEY must be different")
+            raise ValueError(
+                "RELAYX_AUTH_TOKEN and RELAYX_ENCRYPTION_KEY must be different"
+            )
         return self
 
     @property
