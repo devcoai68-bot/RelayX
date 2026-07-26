@@ -92,7 +92,7 @@ class RelayRequest:
             not isinstance(self.host, str)
             or not self.host
             or _has_ctl(self.host)
-            or any(ch in self.host for ch in "/?#")
+            or any(ch in self.host for ch in "/?#@")
             or "://" in self.host
         ):
             raise ProtocolError("invalid host")

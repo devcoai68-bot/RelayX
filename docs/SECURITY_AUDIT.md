@@ -97,3 +97,68 @@ Structured logs are suitable for operational telemetry and avoid secrets by cons
 - Use firewall egress rules to restrict which upstream networks the RelayX server may reach.
 - Keep conservative body and decompression limits unless memory sizing justifies larger values.
 - Run as a non-root user with systemd or Docker restart policies and log rotation.
+
+## Independent production-readiness audit update (2026-07-26)
+
+This audit reviewed the full repository, including runtime modules, tests, benchmarks, Docker, CI, and operator documentation. The v1 wire protocol remains unchanged: encrypted RelayRequest/RelayResponse/RelayError msgpack payloads carried as HTTP/1.1 POST `application/octet-stream` packets.
+
+### Fixes implemented in this audit
+
+- Hardened local HTTP request parsing by validating methods and header fields before constructing RelayRequest objects, rejecting obsolete folded headers, enforcing exactly one Host header, rejecting invalid Host ports, and rejecting absolute-form targets whose authority does not match Host. This reduces request-smuggling and authority-confusion risk at the client proxy boundary.
+- Hardened RelayRequest host validation to reject `@`, preventing userinfo-style authority confusion when the server constructs upstream URLs.
+- Filtered hop-by-hop and proxy-only response headers before serializing upstream responses, so RelayX does not relay connection-specific metadata back across the encrypted application relay.
+- Added regression tests for userinfo host smuggling, duplicate Host headers, and absolute-form Host mismatches.
+
+### Production-readiness score after fixes
+
+| Area | Score | Deductions |
+| --- | ---: | --- |
+| Architecture | 8/10 | Clear module separation, but local proxy parsing remains intentionally minimal and fully buffered. |
+| Security | 7/10 | AEAD, replay protection, and size bounds are present; remaining risk is broad upstream reach if operators expose credentials to untrusted clients. |
+| Protocol | 8/10 | HTTP/1.1 POST carrier is preserved; unsupported streaming, CONNECT, SOCKS, WebSocket, HTTP/2, and transfer-encoding paths are rejected. |
+| Performance | 7/10 | Compression and buffering are bounded, but the proxy header reader is conservative and fully buffered by design. |
+| Testing | 7/10 | Unit, integration, hardening, and benchmark validation tests exist; more fuzzing and long-running concurrency stress should be added before very high-risk deployments. |
+| Documentation | 8/10 | Install, operations, testing, release, and security docs exist; operators still need deployment-specific SSRF policy documentation. |
+| Deployment | 7/10 | Docker and CI exist; production reverse-proxy rate limits, WAF policy, and secret rotation are operator responsibilities. |
+| Maintainability | 8/10 | Small modules and typed code; additional parser fuzzing would protect future changes. |
+| Overall | 7.5/10 | Suitable for controlled production with strict operator controls, not for unauthenticated or untrusted-client public relay service. |
+
+### Final verdict
+
+RelayX is closer to production-ready after this audit, but I would approve public Internet deployment only when operators satisfy these assumptions:
+
+1. Relay server access is restricted to trusted clients with high-entropy bearer tokens and independently rotated 32-byte encryption keys.
+2. Operators enforce network egress policy outside the process if clients are not fully trusted, because RelayX intentionally forwards application HTTP requests selected by the authenticated client.
+3. Reverse proxies or load balancers enforce request-rate limits, connection limits, TLS, and slow-client protection before traffic reaches the ASGI app.
+4. Replay cache sizing is capacity-planned for peak authenticated request rate and replay-window duration.
+5. CI security jobs (`bandit`, `pip-audit`, Docker build, and tests) are required before release.
+
+Remaining v1 risks are primarily operational: SSRF-by-design for trusted clients, fully buffered memory use up to configured limits, and limited fuzz/stress coverage. A future v2 should add configurable upstream allow/deny policy, parser fuzz targets, long-running concurrency/stress tests, metrics export, and first-class rate limiting while keeping the v1 wire protocol stable for compatibility.
+
+## RC1 final production hardening audit (2026-07-26)
+
+The RC1 audit re-reviewed runtime code, tests, benchmark tooling, Docker, Compose, nginx, CI, release documentation, and operations guidance. No protocol, packet, AAD, encryption, replay, message-schema, or API behavior changes were made.
+
+### Scores
+
+| Category | Score |
+| --- | ---: |
+| Security | 82/100 |
+| Reliability | 80/100 |
+| Maintainability | 84/100 |
+| Performance | 78/100 |
+| Production Readiness | 81/100 |
+
+### Remaining issues and mitigations
+
+| Priority | Issue | Severity | Likelihood | Impact | Recommended mitigation |
+| --- | --- | --- | --- | --- | --- |
+| Must fix before v1 public operation | Operator egress/SSRF policy must be explicit for less-trusted clients. RelayX intentionally forwards authenticated client-selected HTTP targets. | High | Medium | Internal service exposure if credentials are given to untrusted clients. | Enforce firewall, cloud security-group, Kubernetes NetworkPolicy, or outbound proxy allowlists before Internet-facing deployment. |
+| Must fix before v1 public operation | TLS, rate limits, body limits, and slow-client controls are external reverse-proxy responsibilities. | High | Medium | Credential exposure or resource exhaustion if RelayX is exposed directly without equivalent controls. | Deploy behind nginx or equivalent with POST-only `/relay`, TLS, body limits, timeouts, and connection/rate limits. |
+| Recommended later | Replay cache is in-memory and single-process. | Medium | Medium | Replays may be accepted after restart or across non-sticky multi-instance routing. | Use sticky routing for v1 HA deployments; design shared replay state only in a future compatible implementation. |
+| Recommended later | Parser and codec fuzzing are not yet first-class CI jobs. | Medium | Low | Malformed input edge cases may regress. | Add fuzz/property tests for HTTP parsing, MsgPack validation, decompression bounds, and packet headers. |
+| Nice to have | Native metrics export is not included. | Low | Medium | Operators must infer rates and cache pressure from logs and process metrics. | Add Prometheus/OpenTelemetry metrics without changing the v1 wire protocol. |
+
+### RC1 verdict
+
+RelayX v1.0.0 is acceptable as a release candidate for controlled production deployments where authenticated clients are trusted and operators enforce the documented reverse-proxy, TLS, resource-limit, and egress controls. I would not approve a deployment that exposes RelayX directly to the public Internet without those controls, and I would not treat RelayX as safe for arbitrary untrusted clients until configurable upstream policy is added.

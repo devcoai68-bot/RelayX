@@ -6,11 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-26
+
 ### Added
 
+- v1.0.0 release notes covering architecture, security features, limitations, deployment notes, upgrade notes, and future roadmap.
 - GitHub Actions CI for linting, formatting, type checking, compileall, tests, benchmark validation, security checks, and Docker builds.
 - Tooling configuration for Ruff, Black, isort, mypy, coverage, Bandit, pip-audit, and pre-commit.
 - Contributor, security, license, and release checklist documentation.
+
+### Changed
+
+- Prepared package metadata for v1.0.0 and added bounded dependency ranges for runtime dependencies.
+- Hardened Docker, Docker Compose, nginx, and operations documentation for release-candidate deployments.
+
+### Security
+
+- Documented egress/SSRF controls, Linux resource controls, reverse-proxy requirements, and disaster recovery assumptions for production operators.
 
 ## [0.1.0] - 2026-07-25
 

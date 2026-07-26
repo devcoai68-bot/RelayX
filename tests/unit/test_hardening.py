@@ -34,6 +34,20 @@ def request(**overrides):
     return RelayRequest(**values)
 
 
+def test_request_model_rejects_userinfo_host_smuggling():
+    with pytest.raises(ProtocolError):
+        request(host="victim.example@127.0.0.1")
+
+
+def test_parser_rejects_duplicate_host_and_absolute_form_mismatch():
+    from relayx.http.parser import _target
+
+    with pytest.raises(ProtocolError):
+        _target("GET", "/", (("Host", "a"), ("Host", "b")), b"")
+    with pytest.raises(ProtocolError):
+        _target("GET", "https://a.example/", (("Host", "b.example"),), b"")
+
+
 def test_method_token_validation_rejects_invalid_token():
     with pytest.raises(ProtocolError):
         request(method="BAD METHOD")
