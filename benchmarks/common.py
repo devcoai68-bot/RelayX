@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import base64
 import cProfile
+import hashlib
 import io
 import os
 import pstats
@@ -42,6 +43,8 @@ LARGE_PAYLOAD_SIZES: tuple[int, ...] = (
 CONCURRENCY_LEVELS: tuple[int, ...] = (1, 10, 50, 100, 200, 500)
 REPLAY_CACHE_SIZES: tuple[int, ...] = (10_000, 100_000, 500_000, 1_000_000)
 BENCHMARK_KEY = base64.b64encode(b"b" * 32).decode()
+_BENCHMARK_AUTH_SEED = b"relayx benchmark authentication fixture v1"
+BENCHMARK_AUTH_TOKEN = hashlib.sha256(_BENCHMARK_AUTH_SEED).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -91,7 +94,7 @@ def incompressible_payload(size: int) -> bytes:
 
 def default_settings(**overrides: Any) -> RelaySettings:
     values: dict[str, Any] = {
-        "auth_token": "benchmark-auth-token",
+        "auth_token": BENCHMARK_AUTH_TOKEN,
         "encryption_key": BENCHMARK_KEY,
         "max_request_body_bytes": 32 * 1024 * 1024,
         "max_response_body_bytes": 32 * 1024 * 1024,

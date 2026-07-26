@@ -5,7 +5,8 @@ from __future__ import annotations
 import importlib.metadata
 import os
 import platform
-import subprocess
+import shutil
+import subprocess  # nosec B404: benchmark metadata uses subprocess with a resolved executable and shell disabled.
 from pathlib import Path
 from typing import Any
 
@@ -47,14 +48,19 @@ def _package_versions() -> dict[str, str]:
 
 
 def _git_commit(repo_root: Path) -> str:
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return "unknown"
+
     try:
         completed = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [git_executable, "rev-parse", "HEAD"],
             cwd=repo_root,
             check=True,
             capture_output=True,
             text=True,
-        )
+            shell=False,
+        )  # nosec B603: git_executable is resolved by shutil.which(), arguments are fixed, and shell is disabled.
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return completed.stdout.strip()
