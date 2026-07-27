@@ -1,168 +1,80 @@
-# RelayX Operations Guide
+# RelayX Operations
 
-## Monitoring goals
+RelayX operational commands do not change the v1 protocol, packet format, crypto, replay protection, parser behavior, or benchmark methodology.
 
-Monitor availability, readiness, latency, error rates, process resource use, replay-cache pressure, and reverse-proxy behavior. RelayX is fully buffered, so memory and timeout monitoring are especially important.
+## CLI commands
 
-## Health endpoint
+- `relayx server` and `relayx client` remain backward compatible.
+- `relayx config init|show|validate` manages `.env` configuration.
+- `relayx generate-secret` creates an auth token and 32-byte base64 encryption key.
+- `relayx install service` installs a hardened systemd unit.
+- `relayx service status|start|stop|restart` delegates to `systemctl`.
+- `relayx uninstall service` removes only the unit unless `--purge` is supplied.
+- `relayx doctor` reports PASS, WARNING, and ERROR diagnostics.
+- `relayx version` prints RelayX, Python, OpenSSL, Git, and platform details.
 
-`GET /health` confirms the application process is running.
-
-```sh
-curl -f http://127.0.0.1:8000/health
-```
-
-Expected response:
-
-```json
-{"status":"ok"}
-```
-
-Use this endpoint for basic process liveness checks.
-
-## Ready endpoint
-
-`GET /ready` confirms the replay cache is initialized and the forwarder is available.
+## Service upgrade
 
 ```sh
-curl -f http://127.0.0.1:8000/ready
+python -m pip install --upgrade 'git+https://github.com/devcoai68-bot/RelayX.git'
+sudo systemctl restart relayx.service
+relayx version
 ```
 
-Expected response includes `"status":"ready"`. Use this endpoint for load balancer readiness checks.
-
-## Resource monitoring
-
-### CPU
-
-High CPU may indicate high encryption/decryption throughput, compression work, or benchmark traffic.
+## Service uninstall
 
 ```sh
-top -p $(pgrep -f 'relayx server')
+sudo relayx uninstall service
 ```
 
-### RAM
-
-Memory use grows with concurrent buffered carrier bodies, decompressed packets, request bodies, and upstream responses.
+Configuration is retained. To intentionally delete the default environment file and working directory:
 
 ```sh
-ps -o pid,rss,cmd -p $(pgrep -f 'relayx server')
+sudo relayx uninstall service --purge
 ```
 
-Keep `RELAYX_MAX_REQUEST_BODY_BYTES`, `RELAYX_MAX_RESPONSE_BODY_BYTES`, `RELAYX_MAX_CARRIER_BODY_BYTES`, and `RELAYX_MAX_DECOMPRESSED_BYTES` aligned with available RAM and concurrency.
+## Secret rotation
 
-### File descriptors
+Generate new values:
 
 ```sh
-cat /proc/$(pgrep -f 'relayx server')/limits | grep 'Max open files'
-ls /proc/$(pgrep -f 'relayx server')/fd | wc -l
+relayx generate-secret
 ```
 
-Recommended systemd value: `LimitNOFILE=65536` for production deployments.
-
-## Timeouts
-
-RelayX uses `RELAYX_TIMEOUT_SECONDS` for upstream HTTP operations and graceful shutdown drain. nginx `proxy_read_timeout` and `proxy_send_timeout` should be at least as large as this value. Avoid very large timeout values unless upstream latency requires them.
-
-## Restart strategy
-
-systemd recommendation:
-
-```ini
-Restart=on-failure
-RestartSec=5
-TimeoutStopSec=45
-```
-
-Docker Compose recommendation:
-
-```yaml
-restart: unless-stopped
-```
-
-## Log rotation
-
-For systemd-journald deployments, configure retention in `/etc/systemd/journald.conf`. For nginx logs, use the distribution logrotate package. RelayX logs are structured JSON on stdout/stderr and intentionally avoid bearer tokens, encryption keys, authorization headers, and request/response bodies.
-
-## systemd recommendations
-
-Use a dedicated unprivileged user, read-only filesystem protections, private temporary directories, no new privileges, and explicit environment files with mode `0600`.
-
-## Docker recommendations
-
-- Run with the image's non-root user.
-- Pass secrets through an environment file or secret manager.
-- Set memory limits that reflect RelayX body limits.
-- Publish the RelayX port only to a trusted reverse proxy network when possible.
-- Use health checks against `/health` and readiness checks against `/ready` at the orchestrator level.
-
-## nginx recommendations
-
-- Preserve `Authorization` and `Content-Type` headers.
-- Force HTTP/1.1 upstream proxying.
-- Set `client_max_body_size` to match `RELAYX_MAX_CARRIER_BODY_BYTES`.
-- Disable response buffering for predictable relay latency.
-- Use TLS and modern cipher settings.
-- Restrict `/relay` to POST traffic when practical.
-
-## Backup recommendations
-
-Back up only deployment metadata and secrets that are required for continuity:
-
-- `/etc/relayx/server.env`
-- systemd unit files
-- nginx site configuration
-- release version or container image digest
-
-Protect backups because they contain credentials. Runtime replay-cache contents are intentionally not backed up.
-
-## Recommended production settings
-
-- `RELAYX_SERVER_HOST=127.0.0.1` behind nginx.
-- `RELAYX_LOG_LEVEL=INFO` for normal production use.
-- `RELAYX_TIMEOUT_SECONDS=30` unless upstream behavior requires a different value.
-- Default request, response, carrier, decompressed, replay, and header limits unless capacity planning justifies changes.
-- Independent high-entropy values for `RELAYX_AUTH_TOKEN` and `RELAYX_ENCRYPTION_KEY`.
-- Host firewall egress rules that prevent unwanted access to metadata services or private networks if authenticated clients are not fully trusted.
-
-## Release-candidate operational hardening
-
-### Reverse proxy and TLS assumptions
-
-RelayX should normally bind to `127.0.0.1` and sit behind nginx or an equivalent TLS terminator. The reverse proxy must preserve `Authorization` and `Content-Type`, must proxy to RelayX with HTTP/1.1, and should restrict `/relay` to POST. Do not expose the ASGI server directly to the Internet unless an equivalent front-end enforces TLS, body limits, connection limits, and slow-client timeouts.
-
-Recommended nginx controls:
-
-- `client_max_body_size` equal to or lower than `RELAYX_MAX_CARRIER_BODY_BYTES`.
-- `client_body_timeout`, `proxy_read_timeout`, `proxy_send_timeout`, and `send_timeout` aligned with `RELAYX_TIMEOUT_SECONDS`.
-- `proxy_request_buffering on` to keep slow upload handling in nginx rather than the Python process.
-- `proxy_buffering off` for predictable relay response latency.
-- `limit_except POST { deny all; }` for `/relay`.
-- `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` for operational endpoints.
-
-### Linux resource controls
-
-For systemd deployments, use explicit process limits and sandboxing:
-
-```ini
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-LockPersonality=true
-MemoryDenyWriteExecute=true
-LimitNOFILE=65536
-TasksMax=512
-```
-
-Set host or orchestrator memory limits based on worst-case concurrency. RelayX is fully buffered, so a conservative upper bound is approximately concurrent requests multiplied by carrier limit plus response limit plus decompressed limit, plus Python/runtime overhead.
-
-Suggested host-level checks:
+Edit the environment file, update `RELAYX_AUTH_TOKEN` and `RELAYX_ENCRYPTION_KEY`, deploy the matching client values, then restart:
 
 ```sh
-sysctl net.core.somaxconn
-ulimit -n
-systemctl show relayx -p LimitNOFILE -p TasksMax -p MemoryMax
+sudo systemctl restart relayx.service
+```
+
+## Changing ports
+
+Update `RELAYX_SERVER_PORT` in the environment file or reinstall the unit with an override:
+
+```sh
+sudo relayx install service --port 8179
+sudo systemctl restart relayx.service
+```
+
+## Changing keys
+
+RelayX does not negotiate keys. Update both server and clients atomically during a maintenance window, then restart processes that consume the environment.
+
+## Config migration
+
+Create a fresh template, compare it with the deployed file, copy any new non-secret limits, and keep production secrets unless rotating them:
+
+```sh
+relayx config init --output relayx.new.env --generate-secrets
+relayx config validate --config relayx.new.env
+relayx config validate --config /etc/relayx/relayx.env
+```
+
+## Diagnostics
+
+```sh
+relayx doctor --config /etc/relayx/relayx.env
+relayx service status
 ```
 
 ### Egress and SSRF controls
