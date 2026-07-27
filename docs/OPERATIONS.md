@@ -192,3 +192,73 @@ Replay-cache contents are intentionally not restored. After a restart, packets f
 **Can RelayX be horizontally scaled?** Only with sticky routing or acceptance that replay detection is per process. The v1 replay cache is intentionally in memory.
 
 **Can I use HTTP/2, WebSocket, CONNECT, or streaming?** No. RelayX v1 is intentionally a fully buffered encrypted HTTP application relay over HTTP/1.1 POST.
+
+## Operational CLI reference
+
+The operational CLI preserves `relayx server` and `relayx client` while adding administrator commands:
+
+- `relayx init` creates a first-run configuration with generated secrets and prints next steps.
+- `relayx generate-secret` prints an auth token and independent base64 encryption key.
+- `relayx config init|show|validate` manages environment-file based configuration.
+- `relayx install service` writes a hardened systemd unit, reloads systemd, enables the service, and optionally starts it.
+- `relayx service status|start|stop|restart` delegates to systemd for the configured service name.
+- `relayx uninstall service` stops/disables the service, removes the unit, reloads systemd, and only deletes config/working paths when `--purge` is explicit.
+- `relayx doctor` reports PASS/WARNING/ERROR diagnostics for runtime dependencies, config, secrets, permissions, systemd, Docker, and nginx.
+- `relayx version` prints RelayX, Python, OpenSSL, Git commit, and platform information.
+
+### Service upgrade
+
+```sh
+python -m pip install --upgrade 'git+https://github.com/devcoai68-bot/RelayX.git'
+sudo systemctl restart relayx.service
+relayx version
+```
+
+### Service uninstall
+
+```sh
+sudo relayx uninstall service
+```
+
+Configuration is retained. To intentionally delete the default environment file and working directory:
+
+```sh
+sudo relayx uninstall service --purge
+```
+
+### Secret rotation
+
+Generate new values:
+
+```sh
+relayx generate-secret
+```
+
+Edit the server environment file, deploy matching client values, then restart the processes that consume those variables:
+
+```sh
+sudo systemctl restart relayx.service
+```
+
+### Changing ports
+
+Update `RELAYX_SERVER_PORT` in the environment file or reinstall with a unit-level override:
+
+```sh
+sudo relayx install service --port 8179
+sudo systemctl restart relayx.service
+```
+
+### Changing keys
+
+RelayX does not negotiate keys. Update server and clients atomically during a maintenance window, then restart each process using the environment.
+
+### Config migration
+
+Create a fresh template, compare it with the deployed file, copy new non-secret limits, and keep production secrets unless rotating them:
+
+```sh
+relayx config init --output relayx.new.env --generate-secrets
+relayx config validate --config relayx.new.env
+relayx config validate --config /etc/relayx/relayx.env
+```

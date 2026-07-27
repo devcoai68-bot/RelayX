@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Made CI coverage artifact handling deterministic by verifying generated `coverage.xml` and `htmlcov/` before upload.
+- Hardened operational CLI subprocess usage for Bandit by resolving executables, validating service/account names, avoiding shell execution, and narrowing exception handling.
+
+
 ## [1.0.0] - 2026-07-26
 
 ### Added
