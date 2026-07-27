@@ -56,10 +56,14 @@ jobs:
         run: python -m compileall relayx benchmarks tests
 
       - name: Run unit tests with coverage
-        run: pytest tests/unit --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html
+        run: pytest tests/unit --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+
+      - name: Verify coverage reports exist
+        if: matrix.python-version == '3.12'
+        run: test -f coverage.xml && test -d htmlcov
 
       - name: Upload coverage reports
-        if: always() && matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports

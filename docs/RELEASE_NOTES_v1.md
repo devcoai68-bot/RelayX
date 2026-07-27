@@ -42,6 +42,10 @@ RelayX remains intentionally not a VPN, SOCKS proxy, CONNECT tunnel, TCP tunnel,
 
 ## Deployment Notes
 
+- RelayX can be installed directly with `pip install git+https://github.com/devcoai68-bot/RelayX.git` or isolated with `pipx install git+https://github.com/devcoai68-bot/RelayX.git`.
+- Operational commands are available for config initialization/validation, secret generation, doctor checks, version reporting, and hardened systemd service install/uninstall.
+
+
 - Use Python 3.12 or newer.
 - Bind RelayX to loopback behind nginx where possible.
 - Preserve `Authorization` and `Content-Type` through the reverse proxy.

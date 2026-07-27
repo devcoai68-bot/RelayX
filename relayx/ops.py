@@ -6,10 +6,11 @@ import base64
 import importlib.metadata
 import os
 import platform
+import re
 import secrets
 import shutil
 import ssl
-import subprocess
+import subprocess  # nosec B404 - subprocess is used with absolute executables and shell=False.
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,11 +21,14 @@ from pydantic import ValidationError
 from relayx import __version__
 from relayx.config import RelaySettings
 from relayx.crypto.keys import decode_encryption_key
+from relayx.errors import ConfigError
 
 DEFAULT_SERVICE_NAME = "relayx"
 DEFAULT_UNIT_DIR = Path("/etc/systemd/system")
 DEFAULT_WORKING_DIRECTORY = Path("/var/lib/relayx")
 DEFAULT_ENVIRONMENT_FILE = Path("/etc/relayx/relayx.env")
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$")
+_SAFE_ACCOUNT_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,34 @@ def generate_secrets() -> SecretBundle:
         auth_token=secrets.token_urlsafe(48),
         encryption_key=base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     )
+
+
+def validate_service_name(value: str) -> str:
+    if not _SAFE_NAME_RE.fullmatch(value) or value.startswith("-"):
+        raise ValueError(
+            "service names may contain only letters, numbers, '.', '_', '@', and '-'"
+        )
+    return value
+
+
+def validate_account_name(value: str, label: str) -> str:
+    if not _SAFE_ACCOUNT_RE.fullmatch(value):
+        raise ValueError(f"{label} must be a valid system account name")
+    return value
+
+
+def _resolve_executable(name: str) -> str:
+    executable = shutil.which(name)
+    if executable is None:
+        raise FileNotFoundError(f"required executable not found: {name}")
+    return executable
+
+
+def _relayx_exec_start() -> str:
+    relayx = shutil.which("relayx")
+    if relayx:
+        return f"{relayx} server"
+    return f"{sys.executable} -m relayx.cli server"
 
 
 def env_template(
@@ -89,8 +121,8 @@ def write_env_file(path: Path, content: str, *, overwrite: bool = False) -> None
     path.write_text(content, encoding="utf-8")
     try:
         path.chmod(0o600)
-    except PermissionError:
-        pass
+    except PermissionError as exc:
+        raise PermissionError(f"unable to set secure permissions on {path}") from exc
 
 
 def systemd_unit(
@@ -105,7 +137,11 @@ def systemd_unit(
     encryption_key: str | None = None,
     working_directory: str | Path = DEFAULT_WORKING_DIRECTORY,
     environment_file: str | Path | None = DEFAULT_ENVIRONMENT_FILE,
+    memory_max: str | None = None,
 ) -> str:
+    validate_service_name(service_name)
+    validate_account_name(user, "user")
+    validate_account_name(group, "group")
     env_parts = []
     if host:
         env_parts.append(f"RELAYX_SERVER_HOST={host}")
@@ -121,6 +157,7 @@ def systemd_unit(
     if env_parts:
         env_line = 'Environment="' + '" "'.join(env_parts) + '"\n'
     env_file_line = f"EnvironmentFile=-{environment_file}\n" if environment_file else ""
+    memory_line = f"MemoryMax={memory_max}\n" if memory_max else ""
     return f"""[Unit]
 Description=RelayX encrypted HTTP relay ({service_name})
 After=network-online.target
@@ -131,7 +168,7 @@ Type=simple
 User={user}
 Group={group}
 WorkingDirectory={working_directory}
-{env_file_line}{env_line}ExecStart={shutil.which('relayx') or sys.executable + ' -m relayx.cli'} server
+{env_file_line}{env_line}ExecStart={_relayx_exec_start()}
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
@@ -139,6 +176,11 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths={working_directory}
+ReadOnlyPaths=/etc/relayx
+RuntimeDirectory={service_name}
+RuntimeDirectoryMode=0750
+LimitNOFILE=65536
+{memory_line}TasksMax=512
 CapabilityBoundingSet=
 LockPersonality=true
 MemoryDenyWriteExecute=true
@@ -155,8 +197,14 @@ def run_commands(commands: Iterable[list[str]], *, dry_run: bool = False) -> lis
     for command in commands:
         rendered.append(" ".join(command))
         if not dry_run:
-            subprocess.run(command, check=True)
+            subprocess.run(
+                command, check=True
+            )  # nosec B603 - validated absolute argv, shell=False.
     return rendered
+
+
+def _service_unit_name(service_name: str) -> str:
+    return f"{validate_service_name(service_name)}.service"
 
 
 def install_service(
@@ -171,29 +219,50 @@ def install_service(
     start: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
-    unit_path = unit_dir / f"{service_name}.service"
-    actions = [f"write {unit_path}\n{unit_text}"]
+    service_name = validate_service_name(service_name)
+    user = validate_account_name(user, "user")
+    validate_account_name(group, "group")
+    systemctl = _resolve_executable("systemctl")
     commands: list[list[str]] = []
     if create_user:
-        commands.append(
-            [
-                "sh",
-                "-c",
-                f"id -u {user} >/dev/null 2>&1 || useradd --system --home-dir {working_directory} --shell /usr/sbin/nologin --user-group {user}",
-            ]
-        )
+        id_executable = _resolve_executable("id")
+        useradd = _resolve_executable("useradd")
+        user_exists = False
+        if not dry_run:
+            result = subprocess.run(  # nosec B603 - absolute executable, validated user, shell=False.
+                [id_executable, "-u", user],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            user_exists = result.returncode == 0
+        if dry_run or not user_exists:
+            commands.append(
+                [
+                    useradd,
+                    "--system",
+                    "--home-dir",
+                    str(working_directory),
+                    "--shell",
+                    "/usr/sbin/nologin",
+                    "--user-group",
+                    user,
+                ]
+            )
+    unit_path = unit_dir / _service_unit_name(service_name)
+    actions = [f"write {unit_path}\n{unit_text}"]
     if not dry_run:
         working_directory.mkdir(parents=True, exist_ok=True)
         unit_dir.mkdir(parents=True, exist_ok=True)
         unit_path.write_text(unit_text, encoding="utf-8")
     commands.extend(
         [
-            ["systemctl", "daemon-reload"],
-            ["systemctl", "enable", f"{service_name}.service"],
+            [systemctl, "daemon-reload"],
+            [systemctl, "enable", _service_unit_name(service_name)],
         ]
     )
     if start:
-        commands.append(["systemctl", "start", f"{service_name}.service"])
+        commands.append([systemctl, "start", _service_unit_name(service_name)])
     return actions + run_commands(commands, dry_run=dry_run)
 
 
@@ -205,18 +274,20 @@ def uninstall_service(
     purge: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
-    unit_path = unit_dir / f"{service_name}.service"
+    service_name = validate_service_name(service_name)
+    systemctl = _resolve_executable("systemctl")
+    unit_path = unit_dir / _service_unit_name(service_name)
     actions = run_commands(
         [
-            ["systemctl", "stop", f"{service_name}.service"],
-            ["systemctl", "disable", f"{service_name}.service"],
+            [systemctl, "stop", _service_unit_name(service_name)],
+            [systemctl, "disable", _service_unit_name(service_name)],
         ],
         dry_run=dry_run,
     )
     actions.append(f"remove {unit_path}")
     if not dry_run and unit_path.exists():
         unit_path.unlink()
-    actions += run_commands([["systemctl", "daemon-reload"]], dry_run=dry_run)
+    actions += run_commands([[systemctl, "daemon-reload"]], dry_run=dry_run)
     if purge:
         for path in purge_paths:
             actions.append(f"purge {path}")
@@ -226,6 +297,16 @@ def uninstall_service(
                 else:
                     path.unlink()
     return actions
+
+
+def service_action(*, service_name: str, action: str) -> int:
+    if action not in {"status", "restart", "stop", "start"}:
+        raise ValueError("unsupported service action")
+    systemctl = _resolve_executable("systemctl")
+    result = subprocess.run(  # nosec B603 - absolute executable, validated action/name, shell=False.
+        [systemctl, action, _service_unit_name(service_name)], check=False
+    )
+    return result.returncode
 
 
 def validate_settings(env_file: Path | None = None) -> tuple[bool, str]:
@@ -238,14 +319,16 @@ def validate_settings(env_file: Path | None = None) -> tuple[bool, str]:
 
 def version_info() -> str:
     commit = "unknown"
-    try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:
-        pass
+    git = shutil.which("git")
+    if git:
+        try:
+            commit = subprocess.check_output(  # nosec B603 - absolute executable, static argv, shell=False.
+                [git, "rev-parse", "--short", "HEAD"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        except (subprocess.CalledProcessError, OSError):
+            commit = "unknown"
     return "\n".join(
         [
             f"RelayX version: {__version__}",
@@ -302,7 +385,7 @@ def doctor(env_file: Path | None = None) -> list[tuple[str, str, str]]:
     try:
         decode_encryption_key(key or "")
         checks.append(("PASS", "encryption key", "32 bytes"))
-    except Exception as exc:
+    except (ConfigError, ValueError, TypeError) as exc:
         checks.append(("ERROR", "encryption key", str(exc)))
     cwd = Path.cwd()
     checks.append(

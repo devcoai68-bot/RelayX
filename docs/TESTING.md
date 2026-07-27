@@ -58,7 +58,7 @@ Expected result: all tests pass when development dependencies are installed from
 ## Coverage
 
 ```sh
-pytest --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html
+pytest tests/unit --cov=relayx --cov=benchmarks --cov-report=xml:coverage.xml --cov-report=html:htmlcov
 ```
 
 Expected outputs:
@@ -72,6 +72,16 @@ Open the HTML report:
 ```sh
 python -m webbrowser htmlcov/index.html
 ```
+
+## CI coverage artifact validation
+
+GitHub Actions verifies both coverage artifact paths before upload:
+
+```sh
+test -f coverage.xml && test -d htmlcov
+```
+
+This keeps coverage reporting mandatory while failing with a clear error if pytest-cov does not produce reports.
 
 ## Benchmark suite
 

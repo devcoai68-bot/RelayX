@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import base64
 
-from relayx.cli import build_parser, main
+from relayx.cli import build_parser
 from relayx.ops import (
     doctor,
     env_template,
     generate_secrets,
     systemd_unit,
+    validate_service_name,
     validate_settings,
 )
 
@@ -38,12 +39,18 @@ def test_systemd_unit_contains_hardening_and_options():
         port=8179,
         working_directory="/tmp/relayx",
         environment_file="/tmp/relayx.env",
+        memory_max="512M",
     )
     assert "NoNewPrivileges=true" in unit
     assert "ProtectSystem=strict" in unit
     assert "RELAYX_SERVER_HOST=0.0.0.0" in unit
     assert "RELAYX_SERVER_PORT=8179" in unit
     assert "EnvironmentFile=-/tmp/relayx.env" in unit
+    assert "ReadOnlyPaths=/etc/relayx" in unit
+    assert "RuntimeDirectory=relayx-test" in unit
+    assert "LimitNOFILE=65536" in unit
+    assert "TasksMax=512" in unit
+    assert "MemoryMax=512M" in unit
 
 
 def test_cli_parses_backward_compatible_modes():
@@ -70,3 +77,14 @@ def test_config_init_dry_run_outputs_env(capsys):
 def test_doctor_output_has_statuses():
     statuses = {status for status, _, _ in doctor()}
     assert statuses <= {"PASS", "WARNING", "ERROR"}
+
+
+def test_service_name_validation_rejects_unsafe_values():
+    assert validate_service_name("relayx-prod") == "relayx-prod"
+    for value in ["", "../../bad", "bad service", "-bad"]:
+        try:
+            validate_service_name(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"accepted unsafe service name: {value}")

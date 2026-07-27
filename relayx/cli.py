@@ -20,6 +20,7 @@ from relayx.ops import (
     env_template,
     generate_secrets,
     install_service,
+    service_action,
     systemd_unit,
     uninstall_service,
     validate_settings,
@@ -131,6 +132,7 @@ def _cmd_install_service(args: argparse.Namespace) -> None:
         encryption_key=args.encryption_key,
         working_directory=args.working_directory,
         environment_file=args.environment_file,
+        memory_max=args.memory_max,
     )
     actions = install_service(
         unit_text=unit,
@@ -158,11 +160,7 @@ def _cmd_uninstall_service(args: argparse.Namespace) -> None:
 
 
 def _cmd_service(args: argparse.Namespace) -> None:
-    import subprocess
-
-    subprocess.run(
-        ["systemctl", args.action, f"{args.service_name}.service"], check=False
-    )
+    raise SystemExit(service_action(service_name=args.service_name, action=args.action))
 
 
 def _cmd_doctor(args: argparse.Namespace) -> None:
@@ -248,6 +246,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--working-directory", default=str(DEFAULT_WORKING_DIRECTORY))
     p.add_argument("--environment-file", default=str(DEFAULT_ENVIRONMENT_FILE))
     p.add_argument("--service-name", default=DEFAULT_SERVICE_NAME)
+    p.add_argument("--memory-max")
     p.add_argument("--unit-dir", default=str(DEFAULT_UNIT_DIR))
     p.add_argument("--create-user", action="store_true")
     p.add_argument("--start", action="store_true")
@@ -280,7 +279,12 @@ def main() -> None:
     if not hasattr(args, "func"):
         parser.print_help()
         raise SystemExit(2)
-    args.func(args)
+    try:
+        args.func(args)
+    except ValueError as exc:
+        parser.error(str(exc))
+    except FileNotFoundError as exc:
+        parser.exit(1, f"relayx: error: {exc}\n")
 
 
 if __name__ == "__main__":
