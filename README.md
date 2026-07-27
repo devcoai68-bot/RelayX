@@ -54,6 +54,26 @@ curl -i http://127.0.0.1:8000/health
 curl -i http://127.0.0.1:8000/ready
 ```
 
+
+## Installation from GitHub and first run
+
+RelayX can be installed directly from GitHub without cloning:
+
+```sh
+python -m pip install 'git+https://github.com/devcoai68-bot/RelayX.git'
+pipx install 'git+https://github.com/devcoai68-bot/RelayX.git'
+```
+
+Create a production-ready environment file with generated secrets and validate it:
+
+```sh
+relayx init --output .env --force
+relayx config validate --config .env
+relayx doctor --config .env
+```
+
+Operational commands include `relayx generate-secret`, `relayx version`, `relayx config init|show|validate`, `relayx install service`, `relayx service status|start|stop|restart`, and `relayx uninstall service`.
+
 ## How RelayX works
 
 1. A local application sends a normal HTTP request to the RelayX client.
